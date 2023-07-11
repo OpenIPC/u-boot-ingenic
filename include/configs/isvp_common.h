@@ -10,7 +10,7 @@
     #define CONFIG_SOC "t31"
 #endif
 
-#define CONFIG_BOOTCOMMAND "setenv setargs setenv bootargs ${bootargs}; run setargs; sf probe 0; sf read ${baseaddr} 0x50000 0x300000; bootm ${baseaddr}; reset"
+#define CONFIG_BOOTCOMMAND "sf probe 0; setenv bootcmd run setflash; saveenv; reset"
 
 #if (defined(CONFIG_DDR2_128M) || defined(CONFIG_DDR3_128M))
 #define CONFIG_EXTRA_SETTINGS \
@@ -36,9 +36,6 @@
 
 #ifdef CONFIG_SPL_MMC_SUPPORT
     #define CONFIG_BOOTCOMMAND "setenv setargs setenv bootargs ${bootargs}; run setargs; sf probe 0; mmc read ${baseaddr} 0x1800 0x3000; bootm ${baseaddr}"
-#endif
-#ifdef CONFIG_SFC_NOR
-    #define CONFIG_BOOTCOMMAND "setenv setargs setenv bootargs ${bootargs}; run setargs; sf probe; sf read ${baseaddr} 0x50000 0x300000; bootm ${baseaddr}; reset"
 #endif
 #ifdef CONFIG_SFC_NAND
     #define CONFIG_BOOTCOMMAND "setenv setargs setenv bootargs ${bootargs}; run setargs; sf probe 0; sfcnand read 0x50000 0x200000 ${baseaddr} ; bootm ${baseaddr}; reset"

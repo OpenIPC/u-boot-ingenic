@@ -131,6 +131,12 @@ static int do_spi_flash_probe(int argc, char * const argv[])
 		spi_flash_free(flash);
 	flash = new;
 
+	if (flash->size / 1024 / 1024 == 8) {
+		setenv("setflash", "run setnor8m");
+	} else {
+		setenv("setflash", "run setnor16m");
+	}
+
 	return 0;
 }
 
