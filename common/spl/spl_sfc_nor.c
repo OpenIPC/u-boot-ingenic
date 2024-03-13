@@ -105,7 +105,7 @@ static int sfc_read_data(unsigned int *data, unsigned int len)
 static int sfc_read(unsigned int addr, unsigned int addr_plus,
 		unsigned int addr_len, unsigned int *data, unsigned int len)
 {
-	unsigned int cmd, ret, qread[1] = {0}, tmp;
+	unsigned int cmd, ret;
 
 	jz_sfc_writel(STOP, SFC_TRIG);
 	jz_sfc_writel(FLUSH, SFC_TRIG);
@@ -123,7 +123,7 @@ static int sfc_read(unsigned int addr, unsigned int addr_plus,
 		return 0;
 }
 
-void sfc_init()
+void sfc_init(void)
 {
 	unsigned int tmp;
 

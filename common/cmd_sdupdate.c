@@ -131,7 +131,6 @@ static int au_check_header_valid(int idx, long nbytes)
 	unsigned long checksum;
 
 	char env[20];
-	char auversion[20];
 
 	hdr = (image_header_t *)LOAD_ADDR;
 	/* check the easy ones first */
@@ -277,7 +276,6 @@ static int update_to_flash(void)
 {
 	int i = 0;
 	long sz;
-	int res, cnt;
 	int uboot_updated = 0;
 	int image_found = 0;
 
@@ -334,8 +332,7 @@ static int update_to_flash(void)
 
 		/* this is really not a good idea, but it's what the */
 		/* customer wants. */
-		cnt = 0;
-		res = au_do_update(i, sz);
+		au_do_update(i, sz);
 
 		if (LOAD_ID != -1)
 			break;
@@ -357,7 +354,6 @@ int do_auto_update(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	block_dev_desc_t *stor_dev;
 	int old_ctrlc;
-	int j;
 	int state = -1;
 	long start = -1, end = 0;
 

@@ -86,6 +86,6 @@ int regulator_get_current_limit(struct regulator *regulator);
 
 enum regulator_outnum { REGULATOR_CORE = 1, REGULATOR_MEM, REGULATOR_IO };
 int spl_regulator_set_voltage(enum regulator_outnum outnum, int vol_mv);
-int spl_regulator_init();
+int spl_regulator_init(void);
 
 #endif

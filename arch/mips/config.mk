@@ -21,7 +21,7 @@
 # MA 02111-1307 USA
 #
 
-CROSS_COMPILE ?= mips-linux-gnu-
+CROSS_COMPILE ?= mipsel-linux-gnu-
 
 # Handle special prefix in ELDK 4.0 toolchain
 ifneq (,$(findstring 4KCle,$(CROSS_COMPILE)))
@@ -38,9 +38,6 @@ endif
 
 # Default to EB if no endianess is configured
 ENDIANNESS ?= -EB
-
-PLATFORM_CPPFLAGS += -msoft-float -std=gnu89
-PLATFORM_CPPFLAGS += -DCONFIG_MIPS -D__MIPS__
 
 #
 # From Linux arch/mips/Makefile
@@ -63,8 +60,9 @@ PLATFORM_CPPFLAGS += -DCONFIG_MIPS -D__MIPS__
 # to RAM, unless we're building SPL which doesn't relocate. $28 is always
 # used as gp.
 #
+
+PLATFORM_CPPFLAGS		+= -std=gnu89 -DCONFIG_MIPS -D__MIPS__
 PLATFORM_CPPFLAGS		+= -G 0 $(ENDIANNESS)
-PLATFORM_CPPFLAGS		+= -msoft-float
 PLATFORM_LDFLAGS		+= -G 0 -static -n -nostdlib $(ENDIANNESS)
 PLATFORM_RELFLAGS		+= -ffunction-sections -fdata-sections
 LDFLAGS_FINAL			+= --gc-sections

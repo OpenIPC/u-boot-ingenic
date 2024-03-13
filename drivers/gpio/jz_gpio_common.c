@@ -170,6 +170,7 @@ int gpio_get_value(unsigned gpio)
 	return pca953x_get_value(gpio);
 #endif
 	}
+	return 0;
 }
 
 int gpio_get_flag(unsigned int gpio)
