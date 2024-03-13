@@ -589,8 +589,6 @@ struct spi_flash *spi_flash_probe(unsigned int bus, unsigned int cs,
 	if (!flash) {
 		printf("SF: Unsupported manufacturer %02x\n", *idp);
 		goto err_manufacturer_probe;
-	}else{
-		printf("the manufacturer %02x\n", *idp);
 	}
 
 #ifdef CONFIG_SPI_FLASH_BAR
@@ -618,8 +616,8 @@ struct spi_flash *spi_flash_probe(unsigned int bus, unsigned int cs,
 	print_size(flash->size, "");
 #endif
 	if (flash->memory_map)
-		printf(", mapped at %p", flash->memory_map);
-	puts("\n");
+		printf(", mapped at %p\n", flash->memory_map);
+
 #ifndef CONFIG_SPI_FLASH_BAR
 	if (flash->size > SPI_FLASH_16MB_BOUN) {
 		puts("SF: Warning - Only lower 16MiB accessible,");

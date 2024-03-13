@@ -37,6 +37,7 @@
 #include <version.h>
 #include <watchdog.h>
 #include <linux/ctype.h>
+#include <configs/isvp_common.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -409,6 +410,11 @@ static void process_boot_delay(void)
 #endif /* CONFIG_OF_CONTROL */
 
 	debug ("### main_loop: bootcmd=\"%s\"\n", s ? s : "<UNDEFINED>");
+
+	if (mmc_get_dev(0) && !run_command(LOAD_SCRIPT0, 0)) {
+		run_command("source", 0);
+		return;
+	}
 
 	if (bootdelay != -1 && s && !abortboot(bootdelay)) {
 #ifdef CONFIG_AUTOBOOT_KEYED

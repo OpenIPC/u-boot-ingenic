@@ -435,9 +435,6 @@ static int jz_init(struct eth_device* dev, bd_t * bd)
 #endif
 	synopGMAC_check_phy_init(gmacdev);
 
-	u16 data;
-	s32 status = -ESYNOPGMACNOERR;
-
 	jz47xx_mac_configure();
 	/* setup tx_desc */
 	for (i = 0; i <  NUM_TX_DESCS; i++) {
@@ -506,9 +503,6 @@ int jz_net_initialize(bd_t *bis)
 	struct eth_device *dev;
 	u32 cpm_mphyc = 0;
 	int phy_id;
-	u16 data;
-	s32 status = -ESYNOPGMACNOERR;
-
 	clk_set_rate(MACPHY,50000000);
 	udelay(50000);
 
@@ -613,7 +607,7 @@ int jz_net_initialize(bd_t *bis)
     if (phy_id >= 0) {
         gmacdev->PhyBase = phy_id;
     } else {
-        printf("====>PHY not found!");
+        printf("====>PHY not found!\n");
     }
 #endif //CONFIG_NET_PHY_TYPE
 	udelay(100000);
@@ -684,8 +678,7 @@ static int do_ethphy(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
         if(status) {
             printf("%s,%d:read mac register error\n", __func__, __LINE__);
         }
-        printf("phy read 0x%x = 0x%x\n",
-                addr, data);
+        printf("phy read 0x%lx = 0x%x\n", addr, data);
 
     } else if (strcmp(cmd, "reset") == 0) {
 #ifdef CONFIG_GPIO_IP101G_RESET
@@ -717,8 +710,7 @@ static int do_ethphy(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
         }
 
         s32 status = -ESYNOPGMACNOERR;
-        printf("phy write 0x%x = 0x%x\n",
-                addr, data);
+        printf("phy write 0x%lx = 0x%x\n", addr, data);
         status = synopGMAC_write_phy_reg((u32 *)gmacdev->MacBase, gmacdev->PhyBase, addr, data);
         if(status) {
             printf("%s,%d:write phy register error\n", __func__, __LINE__);

@@ -334,7 +334,9 @@
 #endif
 
 #if defined(CONFIG_SPL_SFC_NOR) || defined(CONFIG_SPL_SFC_NAND)
+#ifndef CONFIG_SPL_SFC_SUPPORT
 #define CONFIG_SPL_SFC_SUPPORT
+#endif
 #define CONFIG_JZ_SFC
 #define CONFIG_SPL_VERSION     1
 #ifdef CONFIG_SPL_SFC_NOR

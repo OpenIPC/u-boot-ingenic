@@ -464,8 +464,11 @@ static int sfc_read(unsigned int addr, unsigned int addr_plus,
 }
 #endif
 
+#undef CPM_SSICDR
+#undef CPM_CLKGR0
 #define CPM_SSICDR (0xb0000000 + 0x74)
 #define CPM_CLKGR0 (0xb0000000 + 0x20)
+
 int sfc_init(void )
 {
 	unsigned int i;
@@ -978,7 +981,6 @@ void sfc_nor_RDID(unsigned int *idcode)
 
 static void dump_norflash_params(void)
 {
-	int i;
 	printf(" =================================================\n");
 	printf(" ======   gparams->name = %s\n",gparams.name);
 	printf(" ======   gparams->id_manufactory = %x\n",gparams.id_manufactory);
@@ -1091,10 +1093,7 @@ int sfc_nor_init(unsigned int idcode)
 
 int sfc_nor_read(struct spi_flash *flash, unsigned int src_addr, unsigned int count,unsigned int dst_addr)
 {
-
-	int i;
 	int ret = 0;
-
 	flag = 0;
 
 #ifdef CONFIG_SPI_QUAD
@@ -1120,8 +1119,6 @@ int sfc_nor_read(struct spi_flash *flash, unsigned int src_addr, unsigned int co
 
 int sfc_nor_write(struct spi_flash *flash, unsigned int src_addr, unsigned int count,unsigned int dst_addr)
 {
-
-	int i;
 	int ret = 0;
 
 #ifdef CONFIG_SPI_QUAD
@@ -1153,9 +1150,7 @@ int sfc_nor_write(struct spi_flash *flash, unsigned int src_addr, unsigned int c
 
 int sfc_nor_erase(struct spi_flash *flash, unsigned int src_addr, unsigned int count)
 {
-	int i;
 	int ret = 0;
-
 
 #ifdef CONFIG_SPI_QUAD
 	sfc_quad_mode = 1;
