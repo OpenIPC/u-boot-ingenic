@@ -120,6 +120,11 @@ int board_eth_init(bd_t *bis)
 		// Wyze V3
 		gpio_request(48,"wyze_mmc_enable");
 		gpio_direction_output(48,0);
+
+		// TP-Link Tapo TC70 (V3)
+		gpio_request(GPIO_PB(28), "tc70_mmc_enable");
+		gpio_direction_output(GPIO_PB(28), 0);
+
 		if(!getenv("extras"))
 			setenv("extras", "nogmac");
 	}
