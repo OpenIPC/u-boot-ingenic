@@ -26,6 +26,10 @@
 #include <string.h>
 #include <config.h>
 
+#ifndef SKIP_SIZE
+#define SKIP_SIZE 0
+#endif
+
 #define BUFFER_SIZE 4
 #ifdef CONFIG_T41
 #define SKIP_SIZE 2048

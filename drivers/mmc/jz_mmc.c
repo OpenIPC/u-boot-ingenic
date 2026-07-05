@@ -33,13 +33,13 @@ struct jz_mmc_priv {
 	int clk;
 };
 
-#define udelay(int) do{}while(0); //for decreasing time by ykliu
 /* jz_mmc_priv flags */
 #define JZ_MMC_BUS_WIDTH_MASK 0x3
 #define JZ_MMC_BUS_WIDTH_1    0x0
 #define JZ_MMC_BUS_WIDTH_4    0x2
 #define JZ_MMC_BUS_WIDTH_8    0x3
-#define JZ_MMC_SENT_INIT (1 << 2)
+#define JZ_MMC_SENT_INIT      (1 << 2)
+#define JZ_MMC_CARD_ABSENT    (1 << 3) /* Sticky flag indicating card is missing/not responding */
 
 #ifdef CONFIG_SPL_BUILD
 /* SPL will only use a single MMC device (CONFIG_JZ_MMC_SPLMSC) */
@@ -49,6 +49,23 @@ struct jz_mmc_priv mmc_priv[1];
 struct mmc mmc_dev[3];
 struct jz_mmc_priv mmc_priv[3];
 #endif
+
+static int jz_mmc_getcd(struct mmc *mmc)
+{
+	struct jz_mmc_priv *priv = mmc->priv;
+
+	/* If U-Boot explicitly triggers a manual rescan, give hardware another chance */
+	if (mmc->has_init == 0) {
+		priv->flags &= ~JZ_MMC_CARD_ABSENT;
+	}
+
+	/* If we already know the card is absent, don't even bother checking */
+	if (priv->flags & JZ_MMC_CARD_ABSENT) {
+		return 0; /* Card is missing */
+	}
+
+	return 1; /* Assume present for the first attempt */
+}
 
 static uint16_t jz_mmc_readw(struct jz_mmc_priv *priv, uintptr_t off)
 {
@@ -70,6 +87,11 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 {
 	struct jz_mmc_priv *priv = mmc->priv;
 	uint32_t stat, cmdat = 0;
+
+	/* If card was already flagged as absent, abort instantly to save time */
+	if (priv->flags & JZ_MMC_CARD_ABSENT) {
+		return TIMEOUT;
+	}
 
 	/* setup command */
 	jz_mmc_writel(cmd->cmdidx, priv, MSC_CMD);
@@ -125,13 +147,24 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 
 	/* start the command (& the clock) */
 	jz_mmc_writel(MSC_CTRL_START_OP, priv, MSC_CTRL);
-
-	/* wait for completion */
-	while (!(stat = (jz_mmc_readl(priv, MSC_IFLG) & (MSC_IREG_END_CMD_RES | MSC_IREG_TIME_OUT_RES))))
-		udelay(10000);
+	
+	/*  
+	 * 10000 iterations * 10us udelay = 100ms solid hardware timeout window.
+	 */
+	uint32_t cmd_retries = 10000; 
+	while (!(stat = (jz_mmc_readl(priv, MSC_IFLG) & (MSC_IREG_END_CMD_RES | MSC_IREG_TIME_OUT_RES)))) {
+		if (--cmd_retries == 0) {
+			/* Do NOT latch JZ_MMC_CARD_ABSENT here, let U-Boot core retry naturally */
+			return TIMEOUT;
+		}
+		udelay(10); /* Standard microsecond delay */
+	}
+	
 	jz_mmc_writel(stat, priv, MSC_IFLG);
-	if (stat & MSC_IREG_TIME_OUT_RES)
+	if (stat & MSC_IREG_TIME_OUT_RES) {
+		priv->flags |= JZ_MMC_CARD_ABSENT; /* Latch card failure state */
 		return TIMEOUT;
+	}
 
 	if (cmd->resp_type & MMC_RSP_PRESENT) {
 		/* read the response */
@@ -151,8 +184,16 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 		}
 	}
 
+    /* 20000 iterations * 10us udelay = 200ms solid hardware timeout window. */
 	if (cmd->resp_type == MMC_RSP_R1b) {
-		while (!(jz_mmc_readl(priv, MSC_STAT) & MSC_STAT_PRG_DONE));
+		uint32_t r1b_retries = 20000;
+		while (!(jz_mmc_readl(priv, MSC_STAT) & MSC_STAT_PRG_DONE)) {
+			if (--r1b_retries == 0) {
+				priv->flags |= JZ_MMC_CARD_ABSENT;
+				return TIMEOUT;
+			}
+			udelay(10);
+		}
 		jz_mmc_writel(MSC_IREG_PRG_DONE, priv, MSC_IFLG);
 	}
 
@@ -173,30 +214,43 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 		/* read the data */
 		int sz = data->blocks * data->blocksize;
 		void *buf = data->dest;
-		do {
+
+		/* Bounded loop to prevent FIFO race conditions on fast CPUs */
+		while (sz > 0) {
 			stat = jz_mmc_readl(priv, MSC_STAT);
 			if (stat & MSC_STAT_TIME_OUT_READ)
 				return TIMEOUT;
 			if (stat & MSC_STAT_CRC_READ_ERROR)
 				return COMM_ERR;
-			if (stat & MSC_STAT_DATA_FIFO_EMPTY) {
-				udelay(100);
-				continue;
-			}
-			do {
+
+			/* Read from FIFO only if it is explicitly NOT empty */
+			if (!(stat & MSC_STAT_DATA_FIFO_EMPTY)) {
 				uint32_t val = jz_mmc_readl(priv, MSC_RXFIFO);
-				if (sz == 1)
-					*(uint8_t *)buf = (uint8_t)val;
-				else if (sz == 2)
-					put_unaligned_le16(val, buf);
-				else if (sz >= 4)
+				if (sz >= 4) {
 					put_unaligned_le32(val, buf);
-				buf += 4;
-				sz -= 4;
-				stat = jz_mmc_readl(priv, MSC_STAT);
-			} while (!(stat & MSC_STAT_DATA_FIFO_EMPTY));
-		} while (!(stat & MSC_STAT_DATA_TRAN_DONE));
-		while (!(jz_mmc_readl(priv, MSC_IFLG) & MSC_IREG_DATA_TRAN_DONE));
+					buf += 4;
+					sz -= 4;
+				} else if (sz == 2) {
+					put_unaligned_le16(val, buf);
+					buf += 2;
+					sz -= 2;
+				} else if (sz == 1) {
+					*(uint8_t *)buf = (uint8_t)val;
+					buf += 1;
+					sz -= 1;
+				} else {
+					/* Safety fallback to prevent infinite loops */
+					break;
+				}
+			}
+		}
+
+		/* Wait for hardware transaction completion signal */
+		uint32_t tran_retries = 500000;
+		while (!(jz_mmc_readl(priv, MSC_IFLG) & MSC_IREG_DATA_TRAN_DONE)) {
+			if (--tran_retries == 0)
+				return TIMEOUT;
+		}
 		jz_mmc_writel(MSC_IREG_DATA_TRAN_DONE, priv, MSC_IFLG);
 	}
 #else
@@ -299,6 +353,9 @@ static int jz_mmc_core_init(struct mmc *mmc)
 	struct jz_mmc_priv *priv = mmc->priv;
 	unsigned int clkrt = jz_mmc_readl(priv, MSC_CLKRT);
 
+	/* Only clear initialization state, keep JZ_MMC_CARD_ABSENT sticky */
+	priv->flags &= ~JZ_MMC_SENT_INIT;
+
 	/* reset */
 	jz_mmc_writel(MSC_CTRL_RESET, priv, MSC_CTRL);
 #if defined(CONFIG_M200) || defined(CONFIG_T15) || defined(CONFIG_T10) || defined(CONFIG_T20) || defined(CONFIG_T21) || defined(CONFIG_T23) || defined(CONFIG_T30) || defined(CONFIG_T31)
@@ -312,9 +369,9 @@ static int jz_mmc_core_init(struct mmc *mmc)
 	/* enable low power mode */
 	jz_mmc_writel(0x1, priv, MSC_LPM);
 
-	/* maximum timeouts */
-//	jz_mmc_writel(0xffffffff, priv, MSC_RESTO); //use the default value for decreasing time by ykliu
-	jz_mmc_writel(0xffffffff, priv, MSC_RDTO);
+	/* 0xffff = ~160ms hardware timeout at 400kHz. No more waiting forever! */
+	jz_mmc_writel(0xffff, priv, MSC_RESTO);
+	jz_mmc_writel(0xffffff, priv, MSC_RDTO);
 
 	jz_mmc_writel(clkrt, priv, MSC_CLKRT);
 
@@ -327,9 +384,7 @@ static void jz_mmc_init_one(int idx, int controller, uintptr_t base, int clock)
 	struct jz_mmc_priv *priv = &mmc_priv[idx];
 
 	/* fill in the name */
-	strcpy(mmc->name, "msc");
-	mmc->name[10] = '0' + controller;
-	mmc->name[11] = 0;
+	snprintf(mmc->name, sizeof(mmc->name), "jz mmc slot %d", controller);
 
 	/* setup priv */
 	priv->base = base;
@@ -345,7 +400,7 @@ static void jz_mmc_init_one(int idx, int controller, uintptr_t base, int clock)
 #else
 	mmc->init = NULL;
 #endif
-	mmc->getcd = NULL;
+	mmc->getcd = jz_mmc_getcd; /* Use virtual card detect */
 	mmc->getwp = NULL;
 
 	mmc->voltages = MMC_VDD_27_28 |
@@ -361,7 +416,7 @@ static void jz_mmc_init_one(int idx, int controller, uintptr_t base, int clock)
 	mmc->host_caps = MMC_MODE_4BIT | MMC_MODE_HC;
 #endif
 #else
-	mmc->f_max = 52000000;
+	mmc->f_max = 24000000;
 #ifndef CONFIG_FPGA
 #ifdef CONFIG_JZ_MMC_MSC0_PA_8BIT
 	mmc->host_caps = MMC_MODE_8BIT | MMC_MODE_HS_52MHz | MMC_MODE_HS | MMC_MODE_HC;
@@ -383,6 +438,15 @@ void jz_mmc_init(void)
 #if defined(CONFIG_JZ_MMC_MSC0) && (!defined(CONFIG_SPL_BUILD) || (CONFIG_JZ_MMC_SPLMSC == 0))
 #ifdef CONFIG_T23
 	gpio_set_func(GPIO_PORT_B, GPIO_FUNC_0, 0x3 << 4 | 0xf << 0);
+	
+	/* Pull-up for Data lines (D0 - D3) */
+	gpio_enable_pull_up(GPIO_PB(0));
+	gpio_enable_pull_up(GPIO_PB(1));
+	gpio_enable_pull_up(GPIO_PB(2));
+	gpio_enable_pull_up(GPIO_PB(3));
+	
+	/* Pull-up for Command line (CMD) */
+	gpio_enable_pull_up(GPIO_PB(5));
 #endif
 	jz_mmc_init_one(i++, 0, MSC0_BASE, MSC0);
 #endif

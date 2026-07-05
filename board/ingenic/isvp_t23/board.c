@@ -110,6 +110,17 @@ int board_eth_init(bd_t *bis)
 	}
 #endif
 	ret += jz_net_initialize(bis);
+	
+	
+	/* * If jz_net_initialize returns -2 (ENODEV), it indicates that no Ethernet 
+	 * PHY was detected, meaning this is the VEEPAI ma5-code-v14 board.
+	 * In this case, we safely configure PB14 to latch the hardware power circuit.
+	 * This prevents overriding PB14 if an actual Ethernet chip is present on other boards.
+	 */
+	if(ret == -2) {
+		gpio_direction_output(GPIO_PB(14), 1);
+		puts("VEEPAI ma5-code-v14 power latch active!\n");
+	}
 	return ret;
 }
 

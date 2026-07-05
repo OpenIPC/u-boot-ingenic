@@ -180,6 +180,8 @@ ifeq ($(HOSTARCH),$(ARCH))
 CROSS_COMPILE ?=
 endif
 
+CROSS_COMPILE := /opt/toolchains/ingenic_t30_gcc_toolchain/bin/mipsel-linux-
+
 # load other configuration
 include $(TOPDIR)/config.mk
 
@@ -377,7 +379,8 @@ else
 PLATFORM_LIBGCC = -L $(USE_PRIVATE_LIBGCC) -lgcc
 endif
 else
-PLATFORM_LIBGCC := -L $(shell dirname `$(CC) $(CFLAGS) -print-libgcc-file-name`) -lgcc
+#PLATFORM_LIBGCC := -L $(shell dirname `$(CC) $(CFLAGS) -print-libgcc-file-name`) -lgcc
+PLATFORM_LIBGCC := $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
 endif
 PLATFORM_LIBS += $(PLATFORM_LIBGCC)
 export PLATFORM_LIBS

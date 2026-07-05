@@ -1,10 +1,13 @@
 #undef CONFIG_BOOTARGS
 #undef CONFIG_BOOTCOMMAND
 
+/* Protect SPI NAND custom layout from being wiped by generic values */
+#ifndef CONFIG_SFC_NAND
 #undef CONFIG_ENV_OFFSET
 #undef CONFIG_ENV_SECT_SIZE
 #undef CONFIG_ENV_SIZE
 #undef CONFIG_SFC_MIN_ALIGN
+#endif
 
 #undef CONFIG_SYS_BOOTPARAMS_LEN
 #undef CONFIG_SYS_CBSIZE
@@ -15,6 +18,7 @@
 #undef CONFIG_IPADDR
 #undef CONFIG_GATEWAYIP
 #undef CONFIG_SERVERIP
+#undef CONFIG_NETMASK
 #undef CONFIG_ETHADDR
 
 #ifdef __CONFIG_ISVP_H__
@@ -49,7 +53,18 @@
 #define CONFIG_ENV_ROOTSIZE 0x500000
 
 #define CONFIG_BOOTARGS "console=ttyS1,115200 panic=10 root=/dev/mtdblock3 init=/init mtdparts=jz_sfc:256k(boot),64k(env),2048k(kernel),\\${rootmtd}(rootfs),-(rootfs_data) mem=\\${osmem} rmem=\\${rmem} \\${extras}"
-#define CONFIG_BOOTCOMMAND "setenv bootcmd ${cmdnor}; sf probe 0; saveenv; run bootcmd"
+/* #define CONFIG_BOOTCOMMAND "setenv bootcmd ${cmdnor}; sf probe 0; saveenv; run bootcmd" */
+#define CONFIG_BOOTCOMMAND \
+	"mmc rescan; " \
+	"if fatload mmc 0 ${baseaddr} boot.scr; then " \
+		"echo \\\"--- Found script on SD! ---\\\"; " \
+		"source ${baseaddr}; " \
+	"else " \
+		"echo \\\"--- Booting standard OpenIPC ---\\\"; " \
+		"setenv bootcmd ${cmdnor}; " \
+		"sf probe 0; " \
+		"run bootcmd; " \
+	"fi"
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"baseaddr=" __stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
@@ -67,10 +82,13 @@
 	"soc="CONFIG_SOC"\0" \
 	CONFIG_EXTRA_SETTINGS
 
+/* Apply environment configuration conditionally */
+#ifndef CONFIG_SFC_NAND
 #define CONFIG_ENV_OFFSET 0x40000
 #define CONFIG_ENV_SIZE 0x10000
 #define CONFIG_ENV_SECT_SIZE 0x10000
 #define CONFIG_SFC_MIN_ALIGN 0x10000
+#endif
 
 #define CONFIG_AUTOBOOT_KEYED
 #define CONFIG_AUTOBOOT_PROMPT "\nPress ENTER to interrupt boot in %d...\n"
@@ -93,7 +111,15 @@
 #define CONFIG_SYS_PBSIZE (CONFIG_SYS_CBSIZE + sizeof(CONFIG_SYS_PROMPT) + 16)
 #define CONFIG_SYS_MALLOC_LEN (32 * 1024 * 1024)
 #define CONFIG_SYS_BOOTPARAMS_LEN (256 * 1024)
+
+/* Set monitor length depending on layout features */
+#if defined(CONFIG_SFC_NAND)
+#define CONFIG_SYS_MONITOR_LEN (400 * 1024)
+#elif defined(CONFIG_OF_LIBFDT)
+#define CONFIG_SYS_MONITOR_LEN (246 * 1024)
+#else
 #define CONFIG_SYS_MONITOR_LEN (230 * 1024)
+#endif
 
 #define CONFIG_BOOTDELAY 1
 #define CONFIG_CMD_ECHO
