@@ -52,6 +52,15 @@
 #ifdef CONFIG_T10
 #define SKIP_SIZE 2048
 #endif
+#ifdef CONFIG_T15
+#define SKIP_SIZE 2048
+#endif
+#ifdef CONFIG_T20
+#define SKIP_SIZE 2048
+#endif
+#ifdef CONFIG_T21
+#define SKIP_SIZE 2048
+#endif
 #ifdef CONFIG_M200
 #define SKIP_SIZE 2048
 #endif
