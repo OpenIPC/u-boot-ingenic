@@ -120,8 +120,24 @@ int board_eth_init(bd_t *bis)
 		// Wyze V3
 		gpio_request(48,"wyze_mmc_enable");
 		gpio_direction_output(48,0);
-		if(!getenv("extras"))
+		if(!getenv("extras")) {
 			setenv("extras", "nogmac");
+			/* marks the value as this code's, not the owner's */
+			setenv("nogmac_auto", "1");
+		}
+	} else {
+		/* A board whose PHY answered has Ethernet, whatever an earlier
+		 * boot decided: one probe that missed the PHY (a cold boot
+		 * racing its reset) set nogmac above, and the first boot's own
+		 * saveenv kept it in flash, disabling the GMAC on every boot
+		 * after (OpenIPC/firmware#1885). Only the nogmac this code set
+		 * is dropped: one the owner set (a Wi-Fi-only profile) carries
+		 * no nogmac_auto and stays. */
+		char *extras = getenv("extras");
+		if (getenv("nogmac_auto") && extras && !strcmp(extras, "nogmac")) {
+			setenv("extras", NULL);
+			setenv("nogmac_auto", NULL);
+		}
 	}
 #endif
 	return ret;
